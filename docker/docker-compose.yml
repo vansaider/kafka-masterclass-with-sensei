@@ -1,0 +1,72 @@
+version: '3.8'
+services:
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # Основные настройки кластера
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+
+      # Настройки процесса
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+
+      # Настройки слушателей
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+
+      # Настройки контроллера
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@localhost:9093"
+
+      # Настройки хранения
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_MS: -1
+
+      # Дополнительные настройки для совместимости
+      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
+
+      # Пропускаем проверки, которые могут вызвать проблемы
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:latest
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka:9092"
+      SCHEMA_REGISTRY_HOST_NAME: "schema-registry"
+      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/subjects"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:latest
+    container_name: redpanda-console
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: "kafka:9092"
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+volumes:
+  kafka_data:
